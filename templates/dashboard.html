@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CROE — Google Ads Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0e14;
+    --panel: #131922;
+    --panel-2: #1a2230;
+    --border: #232b3a;
+    --text: #e7eef7;
+    --muted: #8a95a8;
+    --accent: #14b8a6;        /* teal */
+    --accent-2: #f97373;      /* coral */
+    --warn: #fbbf24;
+    --good: #22c55e;
+    --bad: #ef4444;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; line-height: 1.5; padding: 24px; }
+  .container { max-width: 1400px; margin: 0 auto; }
+  header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid var(--border); }
+  h1 { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
+  h1 .teal { color: var(--accent); }
+  .meta { color: var(--muted); font-size: 13px; }
+  .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--good); margin-right: 6px; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  .section-title { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin: 32px 0 12px 0; }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .kpi { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .kpi .label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 8px; font-weight: 600; }
+  .kpi .value { font-size: 28px; font-weight: 800; letter-spacing: -1px; }
+  .kpi .sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .kpi.accent .value { color: var(--accent); }
+  .kpi.coral .value { color: var(--accent-2); }
+
+  .period-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tab { padding: 8px 16px; border-radius: 8px; background: var(--panel); border: 1px solid var(--border); color: var(--muted); cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.15s; }
+  .tab:hover { color: var(--text); }
+  .tab.active { background: var(--accent); color: #0a0e14; border-color: var(--accent); font-weight: 700; }
+
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .panel h3 { font-size: 14px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .panel h3 .badge { font-size: 10px; background: var(--panel-2); padding: 3px 8px; border-radius: 6px; color: var(--muted); font-weight: 500; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 12px 8px; color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+  td { padding: 12px 8px; border-bottom: 1px solid var(--border); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td .pill { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+  td .pill.ok { background: rgba(34,197,94,0.15); color: var(--good); }
+  td .pill.warn { background: rgba(251,191,36,0.15); color: var(--warn); }
+  td .pill.bad { background: rgba(239,68,68,0.15); color: var(--bad); }
+  td .pill.muted { background: var(--panel-2); color: var(--muted); }
+  td .small { color: var(--muted); font-size: 11px; display: block; margin-top: 2px; }
+
+  .loading { text-align: center; padding: 40px; color: var(--muted); }
+  .error { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); padding: 16px; border-radius: 8px; color: var(--bad); margin-bottom: 16px; }
+
+  @media (max-width: 900px) {
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .grid-2 { grid-template-columns: 1fr; }
+    table { font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>CROE <span class="teal">·</span> Google Ads</h1>
+      <div class="meta"><span class="status-dot"></span>Atualizado <span id="updated">--</span></div>
+    </header>
+
+    <div id="error-box"></div>
+
+    <!-- KPIs com tabs de periodo -->
+    <div class="period-tabs">
+      <div class="tab active" data-period="today">Hoje</div>
+      <div class="tab" data-period="yesterday">Ontem</div>
+      <div class="tab" data-period="last_7d">7 dias</div>
+      <div class="tab" data-period="last_30d">30 dias</div>
+    </div>
+    <div class="kpi-grid" id="kpis">
+      <div class="kpi"><div class="label">Investido</div><div class="value">--</div></div>
+      <div class="kpi accent"><div class="label">Cliques</div><div class="value">--</div></div>
+      <div class="kpi coral"><div class="label">Conversões</div><div class="value">--</div></div>
+      <div class="kpi"><div class="label">CPA</div><div class="value">--</div></div>
+    </div>
+
+    <!-- Timeline -->
+    <div class="section-title">Evolução · últimos 30 dias</div>
+    <div class="panel">
+      <canvas id="timeline-chart" height="80"></canvas>
+    </div>
+
+    <!-- Campanhas + Search Terms -->
+    <div class="grid-2">
+      <div class="panel">
+        <h3>Campanhas <span class="badge">últimos 30d</span></h3>
+        <table id="campaigns-table">
+          <thead>
+            <tr><th>Nome</th><th>Status</th><th class="num">Cliques</th><th class="num">Custo</th><th class="num">Conv.</th><th class="num">CPA</th></tr>
+          </thead>
+          <tbody><tr><td colspan="6" class="loading">Carregando...</td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <h3>O que pessoas digitaram <span class="badge">top 20 · 30d</span></h3>
+        <table id="terms-table">
+          <thead>
+            <tr><th>Termo pesquisado</th><th class="num">Imp.</th><th class="num">Cliques</th><th class="num">Conv.</th></tr>
+          </thead>
+          <tbody><tr><td colspan="4" class="loading">Carregando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Keywords -->
+    <div class="section-title">Performance por keyword · top 20</div>
+    <div class="panel">
+      <table id="keywords-table">
+        <thead>
+          <tr>
+            <th>Keyword</th><th>Campanha</th><th>Status</th>
+            <th class="num">Imp.</th><th class="num">Cliques</th><th class="num">Custo</th>
+            <th class="num">Conv.</th><th class="num">CPA</th>
+          </tr>
+        </thead>
+        <tbody><tr><td colspan="8" class="loading">Carregando...</td></tr></tbody>
+      </table>
+    </div>
+
+  </div>
+
+<script>
+const fmt = {
+  brl: (v) => 'R$ ' + (v || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}),
+  brl0: (v) => 'R$ ' + Math.round(v || 0).toLocaleString('pt-BR'),
+  num: (v) => (v || 0).toLocaleString('pt-BR'),
+  num1: (v) => (v || 0).toLocaleString('pt-BR', {minimumFractionDigits: 1, maximumFractionDigits: 1}),
+  pct: (v) => (v || 0).toFixed(2) + '%',
+  date: (s) => { const d = new Date(s + 'T00:00:00'); return d.getDate() + '/' + (d.getMonth()+1); },
+};
+
+let DATA = null;
+let timelineChart = null;
+let currentPeriod = 'today';
+
+function renderKPIs(period) {
+  const d = DATA[period] || {};
+  const grid = document.getElementById('kpis');
+  grid.innerHTML = `
+    <div class="kpi"><div class="label">Investido</div><div class="value">${fmt.brl0(d.cost)}</div><div class="sub">${fmt.num(d.impressions)} impressões</div></div>
+    <div class="kpi accent"><div class="label">Cliques</div><div class="value">${fmt.num(d.clicks)}</div><div class="sub">CTR ${fmt.pct(d.ctr)} · CPC ${fmt.brl(d.cpc)}</div></div>
+    <div class="kpi coral"><div class="label">Conversões</div><div class="value">${fmt.num1(d.conversions)}</div><div class="sub">WhatsApp clicks</div></div>
+    <div class="kpi"><div class="label">CPA</div><div class="value">${d.conversions > 0 ? fmt.brl0(d.cpa) : '—'}</div><div class="sub">${d.conversions > 0 ? 'por lead' : 'sem conv. ainda'}</div></div>
+  `;
+}
+
+function renderTimeline() {
+  const tl = DATA.timeline || [];
+  const labels = tl.map(p => fmt.date(p.date));
+  const clicks = tl.map(p => p.clicks);
+  const conv = tl.map(p => p.conversions);
+  const cost = tl.map(p => p.cost);
+
+  const ctx = document.getElementById('timeline-chart').getContext('2d');
+  if (timelineChart) timelineChart.destroy();
+
+  timelineChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {label: 'Cliques', data: clicks, borderColor: '#14b8a6', backgroundColor: 'rgba(20,184,166,0.1)', tension: 0.3, yAxisID: 'y'},
+        {label: 'Conversões', data: conv, borderColor: '#f97373', backgroundColor: 'rgba(249,115,115,0.1)', tension: 0.3, yAxisID: 'y'},
+        {label: 'Custo (R$)', data: cost, borderColor: '#fbbf24', backgroundColor: 'rgba(251,191,36,0.05)', tension: 0.3, yAxisID: 'y2', borderDash: [4, 4]},
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#8a95a8', font: { family: 'Inter', size: 12 } } },
+        tooltip: { backgroundColor: '#1a2230', borderColor: '#232b3a', borderWidth: 1, padding: 12 },
+      },
+      scales: {
+        x: { ticks: { color: '#8a95a8' }, grid: { color: 'rgba(255,255,255,0.03)' } },
+        y: { position: 'left', ticks: { color: '#8a95a8' }, grid: { color: 'rgba(255,255,255,0.03)' } },
+        y2: { position: 'right', ticks: { color: '#8a95a8', callback: (v) => 'R$' + v }, grid: { display: false } },
+      },
+    },
+  });
+}
+
+function statusPill(primary) {
+  if (primary === 'ELIGIBLE' || primary === 'LEARNING') return `<span class="pill ok">${primary}</span>`;
+  if (primary === 'PAUSED') return `<span class="pill muted">PAUSADA</span>`;
+  if (primary === 'NOT_ELIGIBLE') return `<span class="pill bad">não elegível</span>`;
+  return `<span class="pill warn">${primary}</span>`;
+}
+
+function renderCampaigns() {
+  const tbody = document.querySelector('#campaigns-table tbody');
+  const rows = DATA.campaigns || [];
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="loading">Sem dados nos últimos 30 dias.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(c => `
+    <tr>
+      <td>${c.name.replace('[Search] CROE ', '')}<span class="small">${c.id}</span></td>
+      <td>${statusPill(c.primary)}</td>
+      <td class="num">${fmt.num(c.clicks)}</td>
+      <td class="num">${fmt.brl0(c.cost)}</td>
+      <td class="num">${fmt.num1(c.conversions)}</td>
+      <td class="num">${c.conversions > 0 ? fmt.brl0(c.cpa) : '—'}</td>
+    </tr>
+  `).join('');
+}
+
+function approvalPill(s) {
+  if (s === 'APPROVED') return `<span class="pill ok">aprovada</span>`;
+  if (s === 'UNDER_REVIEW') return `<span class="pill warn">review</span>`;
+  if (s === 'DISAPPROVED') return `<span class="pill bad">reprovada</span>`;
+  if (s === 'SITE_SUSPENDED') return `<span class="pill bad">suspensa</span>`;
+  return `<span class="pill muted">${s || '--'}</span>`;
+}
+
+function renderKeywords() {
+  const tbody = document.querySelector('#keywords-table tbody');
+  const rows = (DATA.keywords || []).slice(0, 20);
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="loading">Sem keywords com dados.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(k => `
+    <tr>
+      <td><strong>${k.keyword}</strong><span class="small">${k.match_type} · ${k.ad_group}</span></td>
+      <td>${k.campaign.replace('[Search] CROE ', '')}</td>
+      <td>${approvalPill(k.approval)}</td>
+      <td class="num">${fmt.num(k.impressions)}</td>
+      <td class="num">${fmt.num(k.clicks)}</td>
+      <td class="num">${fmt.brl0(k.cost)}</td>
+      <td class="num">${fmt.num1(k.conversions)}</td>
+      <td class="num">${k.conversions > 0 ? fmt.brl0(k.cpa) : '—'}</td>
+    </tr>
+  `).join('');
+}
+
+function renderTerms() {
+  const tbody = document.querySelector('#terms-table tbody');
+  const rows = (DATA.search_terms || []).slice(0, 20);
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="loading">Sem termos ainda.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(t => `
+    <tr>
+      <td><strong>${t.term}</strong><span class="small">${t.campaign.replace('[Search] CROE ', '')}</span></td>
+      <td class="num">${fmt.num(t.impressions)}</td>
+      <td class="num">${fmt.num(t.clicks)}</td>
+      <td class="num">${fmt.num1(t.conversions)}</td>
+    </tr>
+  `).join('');
+}
+
+async function load() {
+  try {
+    const r = await fetch('/api/data');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    DATA = await r.json();
+    if (DATA.error) throw new Error(DATA.error);
+    document.getElementById('error-box').innerHTML = '';
+    renderKPIs(currentPeriod);
+    renderTimeline();
+    renderCampaigns();
+    renderKeywords();
+    renderTerms();
+    const t = new Date(DATA.fetched_at);
+    document.getElementById('updated').textContent = t.toLocaleTimeString('pt-BR');
+  } catch (e) {
+    document.getElementById('error-box').innerHTML = `<div class="error">Erro: ${e.message}</div>`;
+  }
+}
+
+// Tabs de periodo
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    currentPeriod = tab.dataset.period;
+    if (DATA) renderKPIs(currentPeriod);
+  });
+});
+
+load();
+setInterval(load, 5 * 60 * 1000); // refresh a cada 5min
+</script>
+</body>
+</html>
